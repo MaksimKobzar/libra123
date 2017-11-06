@@ -54,8 +54,9 @@ typedef enum logic[1:0] {
 
 module l1_cache
 #(
-	parameter SET_NUMBER		= 4,
-	parameter SET_SIZE_KB		= 4,
+	parameter SET_NUMBER		= 8,
+	parameter BLOCK_NUMBER	= 128,
+	parameter BLOCK_SIZE		= 32,
 	parameter CORE_CMND_WIDTH	= 2,
 	parameter CORE_WDTH_WIDTH	= 2,
 	parameter CORE_ADDR_WIDTH	= 16,
@@ -105,27 +106,41 @@ core_if_engine i_core_if_engine
 	.req_ack		(core_req_ack),
 	.resp			(core_resp),
 
-	.cache_dcd		(cache_dcd),
-	.hit_not_miss 	(hit_not_miss)
+	.core_req_val	(core_req_val),
+	.core_req_cmd	(core_req_cmd),
+	.core_req_addr	(core_req_addr)
 );
 
-cache_address_decoder i_cache_address_decoder
+l1_addr_decoder i_l1_addr_decoder
+#(
+	.SET_NUMBER		(SET_NUMBER),
+	.BLOCK_NUMBER	(BLOCK_NUMBER),
+	.BLOCK_SIZE		(BLOCK_SIZE)
+)
 (
-	.cache_tag		(core_addr[CACHE_INDEX_MSB +: CACHE_INDEX_WIDTH]),
-	.cache_index	(core_addr[CACHE_INDEX_MSB-1:0]),
-	.cache_dcd		(cache_dcd),
-	.hit_not_miss 	(hit_not_miss),
+	.clk 				(clk),
+
+	.core_req_val		(core_req_val),
+	.core_req_addr		(core_req_addr),
+
+	.tag_wr_val			(),
+	.tag_wr_addr		(),
+	.tag_wr_data		(),
+
+	.data_addr			(),
+	.hit 				(hit)
 );
 
-assign mem_ren = hit_not_miss && core_cmd == SCR1_MEM_CMD_RD;
-assign mem_wen = hit_not_miss && core_cmd == SCR1_MEM_CMD_WR;
+assign mem_ren = hit && core_req_cmd == SCR1_MEM_CMD_RD;
+assign mem_wen = hit && core_req_cmd == SCR1_MEM_CMD_WR;
 
 `ifndef SYNTHESIS
 	ram_model mem
 	(
 		.ren 	(mem_ren),
 		.wen 	(mem_wen),
-		.addr 	(core_addr),
+		.raddr 	(data_addr),
+		.waddr 	(data_addr),
 		.wdata 	(core_wdata),
 		.rdata 	(core_rdata),
 	);
