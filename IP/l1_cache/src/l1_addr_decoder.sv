@@ -15,7 +15,8 @@ module l1_addr_decoder
 #(
 	parameter SET_NUMBER	= 8,
 	parameter BLOCK_NUMBER	= 128,
-	parameter BLOCK_SIZE	= 32
+	parameter BLOCK_SIZE	= 32,
+	parameter L1_CACHE_ADDR_WIDTH = 32
 )
 (
 	input	logic						clk,
@@ -47,33 +48,33 @@ module l1_addr_decoder
 	logic [SET_NUMBER-1:0]			hit_set;
 	logic [SET_NUMBER_WIDTH-1:0]	hit_set_num;
 
-	genvar set_num;
+	genvar tag_bank_index;
 	generate
-		for (set_num = 0; set_num < SET_NUMBER; set_num++) begin : gen_tag_mem
+		for (tag_bank_index = 0; tag_bank_index < SET_NUMBER; tag_bank_index++) begin : gen_tag_mem
 			ram_model
 			#(
 				.ADDR_WIDTH (BLOCK_NUMBER_WIDTH - SET_NUMBER_WIDTH),
-				.DATA_WIDTH (TAG_WIDTH),
+				.DATA_WIDTH (L1_CACHE_ADDR_WIDTH -  - 2),
 			)
-			gen_tag_mem
+			mem_tag
 			(
 				.clk	(clk),
 				.ren	(core_req_val),
 				.raddr	(core_req_addr[`BLOCK_BITS]),
-				.rdata	(tag_rd_data[set_num]),
-				.wen	(tag_wr_val_vec[set_num]),
+				.rdata	(tag_rd_data[tag_bank_index]),
+				.wen	(tag_wr_val_vec[tag_bank_index]),
 				.waddr	(tag_wr_addr),
 				.wdata	(tag_wr_data),
 			);
 
 		end
-		assign tag_wr_val_vec[set_num] = tag_wr_val && tag_wr_addr[`SET_BITS] == set_num;
-		assign hit_set[set_num] = 	tag_rd_data[set_num] == addr[`TAG_BITS] && val_bit_vec[TAG_LSB - 1: BLOCK_NUMBER_LSB];
+		assign tag_wr_val_vec[tag_bank_index] = tag_wr_val && tag_wr_addr[`SET_BITS] == tag_bank_index;
+		assign hit_set[tag_bank_index] = 	tag_rd_data[tag_bank_index] == addr[`TAG_BITS] && val_bit_vec[TAG_LSB - 1: BLOCK_NUMBER_LSB];
 	endgenerate
 
 	always_comb begin
-		for (set_num = 0; set_num < SET_NUMBER; set_num++) begin : decode_hit_set_num
-			if(hit_set[set_num]) hit_set_num = set_num;
+		for (tag_bank_index = 0; tag_bank_index < SET_NUMBER; tag_bank_index++) begin : decode_hit_set_num
+			if(hit_set[tag_bank_index]) hit_set_num = tag_bank_index;
 		end
 	end
 

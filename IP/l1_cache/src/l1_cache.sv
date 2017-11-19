@@ -52,21 +52,24 @@ typedef enum logic[1:0] {
 
 
 
+
 module l1_cache
 #(
-	parameter SET_NUMBER		= 8,
-	parameter BLOCK_NUMBER	= 128,
-	parameter BLOCK_SIZE		= 32,
-	parameter CORE_CMND_WIDTH	= 2,
-	parameter CORE_WDTH_WIDTH	= 2,
-	parameter CORE_ADDR_WIDTH	= 16,
-	parameter CORE_DATA_WIDTH	= 32,
-	parameter CORE_RESP_WIDTH	= 2,
-	parameter L2_CMND_WIDTH		= 2,
-	parameter L2_SIZE_WIDTH		= 3,
-	parameter L2_ADDR_WIDTH		= 16,
-	parameter L2_DATA_WIDTH		= 32,
-	parameter L2_STRB_WIDTH		= L2_DATA_WIDTH/8
+	parameter L1_CACHE_SIZE_B		= 4096,		// L1 cache capacity in bytes
+	parameter L1_CACHE_LINE_SIZE_B	= 32,		// L1 cache line size in bites
+	parameter L1_CACHE_SET_NUMBER	= 8,		// L1 cache set associative number
+
+	parameter CORE_CMND_WIDTH		= 2,
+	parameter CORE_WDTH_WIDTH		= 2,
+	parameter CORE_ADDR_WIDTH		= 16,
+	parameter CORE_DATA_WIDTH		= 32,
+	parameter CORE_RESP_WIDTH		= 2,
+
+	parameter L2_CMND_WIDTH			= 2,
+	parameter L2_SIZE_WIDTH			= 3,
+	parameter L2_ADDR_WIDTH			= 16,
+	parameter L2_DATA_WIDTH			= 32,
+	parameter L2_STRB_WIDTH			= L2_DATA_WIDTH/8
 )
 (
 	input	logic							clk,
@@ -134,19 +137,30 @@ l1_addr_decoder i_l1_addr_decoder
 assign mem_ren = hit && core_req_cmd == SCR1_MEM_CMD_RD;
 assign mem_wen = hit && core_req_cmd == SCR1_MEM_CMD_WR;
 
-`ifndef SYNTHESIS
-	ram_model mem
-	(
-		.ren 	(mem_ren),
-		.wen 	(mem_wen),
-		.raddr 	(data_addr),
-		.waddr 	(data_addr),
-		.wdata 	(core_wdata),
-		.rdata 	(core_rdata),
-	);
-`elif
-	// Compiled SRAM with SET_SIZE_KB size
-`endif
+genvar data_bank_index;
+generate
+	for (data_bank_index = 0; data_bank_index < SET_NUMBER; data_bank_index++) begin : gen_bank
+		`ifdef SYNTHESIS
+			// Compiled SRAM with SET_SIZE_KB size
+		`elif
+			ram_model
+			#(
+				.ADDR_WIDTH ( $clog2(L1_CACHE_SIZE_B / (L1_CACHE_LINE_SIZE_B * L1_CACHE_SET_NUMBER)) ),
+				.DATA_WIDTH ( L1_CACHE_LINE_SIZE_B * 4 												 )
+			)
+			mem_data
+			(
+				.clk 	(clk),
+				.ren 	(mem_ren),
+				.raddr 	(data_addr),
+				.rdata 	(core_rdata),
+				.wen 	(mem_wen),
+				.waddr 	(data_addr),
+				.wdata 	(core_wdata),
+			);
+		`endif
+	end
+endgenerate
 
 endmodule
 
